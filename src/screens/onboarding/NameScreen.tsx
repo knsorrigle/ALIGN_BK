@@ -3,10 +3,14 @@ import { View, Text, TouchableOpacity, TextInput, Animated, Easing, KeyboardAvoi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '@clerk/expo';
 import { ORANGE } from '../../constants/colors';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
 
 const NameScreen = () => {
     const navigation = useNavigation<any>();
+    const { signOut } = useAuth();
+    const saveField = useUpdateOnboarding();
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
 
@@ -53,7 +57,7 @@ const NameScreen = () => {
                 {/* Header */}
                 <View className="flex-row items-center justify-between px-6 py-4">
                     <TouchableOpacity
-                        onPress={() => navigation.navigate('Auth', { screen: 'SignIn' })}
+                        onPress={() => signOut()}
                         className="w-10 h-10 items-center justify-center rounded-full"
                     >
                         <MaterialIcons name="arrow-back" size={24} color="black" />
@@ -107,10 +111,14 @@ const NameScreen = () => {
                 {/* Continue Button */}
                 <View className="px-8 pb-10">
                     <TouchableOpacity
-                        className="w-full bg-black py-4 rounded-full items-center active:scale-95"
-                        onPress={() => navigation.navigate('Birthday')}
+                        className={`w-full py-4 rounded-full items-center active:scale-95 ${firstName.trim() ? 'bg-black' : 'bg-black/20'}`}
+                        disabled={!firstName.trim()}
+                        onPress={async () => {
+                            await saveField({ firstName: firstName.trim() });
+                            navigation.navigate('Birthday');
+                        }}
                     >
-                        <Text className="text-cream text-base font-black uppercase" style={{ letterSpacing: 2 }}>CONTINUE</Text>
+                        <Text className={`text-base font-black uppercase ${firstName.trim() ? 'text-cream' : 'text-black/30'}`} style={{ letterSpacing: 2 }}>CONTINUE</Text>
                     </TouchableOpacity>
                 </View>
 

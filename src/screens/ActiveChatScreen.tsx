@@ -29,7 +29,12 @@ export default function ActiveChatScreen() {
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
     const route = useRoute<any>();
-    const { matchName = 'MATCH', photo = 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&q=80' } = route.params || {};
+    const {
+        matchName = 'MATCH',
+        photo = 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&q=80',
+        pending = false,
+        introMessage = '',
+    } = route.params || {};
 
     const [inputText, setInputText] = useState('');
 
@@ -81,7 +86,7 @@ export default function ActiveChatScreen() {
                     {/* Center Title */}
                     <View style={styles.headerTitleContainer}>
                         <Text style={styles.headerName}>{matchName}</Text>
-                        <Text style={styles.headerStatus}>MATCHED 2D AGO</Text>
+                        <Text style={styles.headerStatus}>{pending ? 'PENDING REQUEST' : 'MATCHED 2D AGO'}</Text>
                     </View>
 
                     {/* More Options Button */}
@@ -106,78 +111,112 @@ export default function ActiveChatScreen() {
                         </View>
                         <Text style={styles.contextTitle}>YOU & {matchName}</Text>
                         <Text style={styles.contextSubtext}>
-                            ALIGNED ON PHOTOGRAPHY AND INDIE MUSIC
+                            {pending ? 'AWAITING THEIR RESPONSE' : 'ALIGNED ON PHOTOGRAPHY AND INDIE MUSIC'}
                         </Text>
                     </View>
 
                     {/* Messages */}
                     <View style={styles.messagesContainer}>
-                        {MOCK_MESSAGES.map((msg) => (
-                            <View
-                                key={msg.id}
-                                style={[
-                                    styles.bubbleWrapper,
-                                    msg.isSent ? styles.bubbleRight : styles.bubbleLeft,
-                                ]}
-                            >
-                                <View
-                                    style={[
-                                        styles.bubble,
-                                        msg.isSent
-                                            ? styles.bubbleSent
-                                            : styles.bubbleReceived,
-                                    ]}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.bubbleText,
-                                            { color: msg.isSent ? CREAM : BLACK },
-                                        ]}
-                                    >
-                                        {msg.text}
+                        {pending ? (
+                            <>
+                                {/* Intro message shown as sent bubble */}
+                                {!!introMessage && (
+                                    <View style={[styles.bubbleWrapper, styles.bubbleRight]}>
+                                        <View style={[styles.bubble, styles.bubbleSent]}>
+                                            <Text style={[styles.bubbleText, { color: CREAM }]}>
+                                                {introMessage}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                )}
+                                {/* Pending lock notice */}
+                                <View style={styles.pendingNotice}>
+                                    <Text style={styles.pendingNoticeText}>
+                                        You can message more once they accept your request
                                     </Text>
                                 </View>
-                                <Text
+                            </>
+                        ) : (
+                            MOCK_MESSAGES.map((msg) => (
+                                <View
+                                    key={msg.id}
                                     style={[
-                                        styles.timestamp,
-                                        { textAlign: msg.isSent ? 'right' : 'left' },
+                                        styles.bubbleWrapper,
+                                        msg.isSent ? styles.bubbleRight : styles.bubbleLeft,
                                     ]}
                                 >
-                                    {msg.time}
-                                </Text>
-                            </View>
-                        ))}
+                                    <View
+                                        style={[
+                                            styles.bubble,
+                                            msg.isSent ? styles.bubbleSent : styles.bubbleReceived,
+                                        ]}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.bubbleText,
+                                                { color: msg.isSent ? CREAM : BLACK },
+                                            ]}
+                                        >
+                                            {msg.text}
+                                        </Text>
+                                    </View>
+                                    <Text
+                                        style={[
+                                            styles.timestamp,
+                                            { textAlign: msg.isSent ? 'right' : 'left' },
+                                        ]}
+                                    >
+                                        {msg.time}
+                                    </Text>
+                                </View>
+                            ))
+                        )}
                     </View>
                 </ScrollView>
 
                 {/* Sticky Input Area */}
                 <View style={[styles.inputContainer, { paddingBottom: insets.bottom > 0 ? insets.bottom : 24 }]}>
-                    <View style={styles.inputPill}>
-                        <TextInput
-                            style={styles.inputField}
-                            placeholder="TYPE A MESSAGE..."
-                            placeholderTextColor="rgba(13,13,13,0.4)"
-                            value={inputText}
-                            onChangeText={setInputText}
-                            selectionColor={ORANGE}
-                            multiline
-                        />
-                        <TouchableOpacity
-                            style={[
-                                styles.sendButton,
-                                inputText.trim().length > 0
-                                    ? { backgroundColor: ORANGE }
-                                    : { backgroundColor: 'rgba(13,13,13,0.05)' },
-                            ]}
-                        >
-                            <Ionicons
-                                name="paper-plane"
-                                size={16}
-                                color={inputText.trim().length > 0 ? CREAM : 'rgba(13,13,13,0.4)'}
-                                style={inputText.trim().length > 0 ? { marginLeft: -2, marginTop: 2 } : {}} // Optically center the paper plane
+                    {pending ? (
+                        <View style={styles.inputPill}>
+                            <TextInput
+                                style={[styles.inputField, { color: 'rgba(13,13,13,0.3)' }]}
+                                placeholder="WAITING FOR THEIR RESPONSE..."
+                                placeholderTextColor="rgba(13,13,13,0.25)"
+                                editable={false}
+                                multiline
                             />
-                        </TouchableOpacity>
-                    </View>
+                            <View style={[styles.sendButton, { backgroundColor: 'rgba(13,13,13,0.05)' }]}>
+                                <Ionicons name="lock-closed" size={14} color="rgba(13,13,13,0.25)" />
+                            </View>
+                        </View>
+                    ) : (
+                        <View style={styles.inputPill}>
+                            <TextInput
+                                style={styles.inputField}
+                                placeholder="TYPE A MESSAGE..."
+                                placeholderTextColor="rgba(13,13,13,0.4)"
+                                value={inputText}
+                                onChangeText={setInputText}
+                                selectionColor={ORANGE}
+                                multiline
+                            />
+                            <TouchableOpacity
+                                style={[
+                                    styles.sendButton,
+                                    inputText.trim().length > 0
+                                        ? { backgroundColor: ORANGE }
+                                        : { backgroundColor: 'rgba(13,13,13,0.05)' },
+                                ]}
+                            >
+                                <Ionicons
+                                    name="paper-plane"
+                                    size={16}
+                                    color={inputText.trim().length > 0 ? CREAM : 'rgba(13,13,13,0.4)'}
+                                    style={inputText.trim().length > 0 ? { marginLeft: -2, marginTop: 2 } : {}}
+                                />
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
             </KeyboardAvoidingView>
         </Animated.View>
@@ -217,7 +256,7 @@ const styles = StyleSheet.create({
     },
     headerName: {
         fontSize: 24, // text-2xl
-        fontFamily: 'ArchivoBlack_400Regular', // Try to use custom or system weight
+        // fontFamily removed — ArchivoBlack not loaded
         fontWeight: '900',
         color: BLACK,
         textTransform: 'uppercase',
@@ -306,6 +345,23 @@ const styles = StyleSheet.create({
         letterSpacing: 1.5, // tracked out grey caps
         textTransform: 'uppercase',
         marginTop: 6,
+    },
+    pendingNotice: {
+        alignSelf: 'center',
+        backgroundColor: 'rgba(13,13,13,0.04)',
+        borderRadius: 16,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        marginTop: 24,
+        maxWidth: '80%',
+    },
+    pendingNoticeText: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: 'rgba(13,13,13,0.45)',
+        letterSpacing: 0.5,
+        textAlign: 'center',
+        lineHeight: 17,
     },
     inputContainer: {
         backgroundColor: CREAM,

@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { CREAM, ORANGE } from '../../constants/colors';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
 
 const POLITICS_OPTIONS = [
     'LIBERAL',
@@ -15,6 +16,7 @@ const POLITICS_OPTIONS = [
 
 const PoliticsScreen = () => {
     const navigation = useNavigation<any>();
+    const saveField = useUpdateOnboarding();
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
     const titleTranslateX = useRef(new Animated.Value(-60)).current;
@@ -111,7 +113,10 @@ const PoliticsScreen = () => {
                 <View className="px-8 pb-4 pt-2">
                     <TouchableOpacity
                         className={`w-full py-4 rounded-full items-center active:scale-95 ${selectedOption ? 'bg-black' : 'bg-black/20'}`}
-                        onPress={() => navigation.navigate('Religion')}
+                        onPress={async () => {
+                            if (selectedOption) await saveField({ politics: selectedOption });
+                            navigation.navigate('Religion');
+                        }}
                         disabled={!selectedOption}
                     >
                         <Text className={`text-base font-black uppercase ${selectedOption ? 'text-cream' : 'text-black/30'}`} style={{ letterSpacing: 2 }}>CONTINUE</Text>

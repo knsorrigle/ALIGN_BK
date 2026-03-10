@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Animated, Easing, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, Easing, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { BLACK, CREAM, ORANGE } from '../../constants/colors';
 import { Check, ArrowRight } from 'lucide-react-native';
 
@@ -69,37 +69,42 @@ const FeatureRow = ({ text, dark }: { text: string; dark: boolean }) => (
     </View>
 );
 
-const APBundleCard = ({ aps, price, badge }: { aps: number; price: number; badge: string | null }) => (
+const APBundleCard = ({ aps, price, badge, selected, onPress }: { aps: number; price: number; badge: string | null; selected: boolean; onPress: () => void }) => (
     <TouchableOpacity
         activeOpacity={0.82}
+        onPress={onPress}
         style={{
             flex: 1,
-            backgroundColor: WHITE,
+            backgroundColor: selected ? BLACK : WHITE,
             borderRadius: 20,
             paddingTop: badge ? 14 : 22,
             paddingBottom: 22,
             paddingHorizontal: 16,
             alignItems: 'center',
             justifyContent: 'center',
-            borderWidth: badge ? 2 : 1.5,
-            borderColor: badge ? ORANGE : 'rgba(0,0,0,0.08)',
+            borderWidth: 2,
+            borderColor: selected ? BLACK : badge ? ORANGE : 'rgba(0,0,0,0.08)',
         }}
     >
         {badge && (
-            <View style={{ backgroundColor: ORANGE, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, marginBottom: 10 }}>
+            <View style={{ backgroundColor: selected ? ORANGE : ORANGE, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20, marginBottom: 10 }}>
                 <Text style={{ fontSize: 8, fontWeight: '900', color: CREAM, letterSpacing: 1.5, textTransform: 'uppercase' }}>{badge}</Text>
             </View>
         )}
-        <Text style={{ fontSize: 40, fontWeight: '900', color: BLACK, letterSpacing: -2, lineHeight: 42 }}>{aps}</Text>
-        <Text style={{ fontSize: 9, fontWeight: '800', color: 'rgba(0,0,0,0.35)', letterSpacing: 2, textTransform: 'uppercase', marginTop: 2, marginBottom: 10 }}>APs</Text>
-        <Text style={{ fontSize: 17, fontWeight: '800', color: BLACK, letterSpacing: -0.5 }}>₹{price}</Text>
+        <Text style={{ fontSize: 40, fontWeight: '900', color: selected ? CREAM : BLACK, letterSpacing: -2, lineHeight: 42 }}>{aps}</Text>
+        <Text style={{ fontSize: 9, fontWeight: '800', color: selected ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.35)', letterSpacing: 2, textTransform: 'uppercase', marginTop: 2, marginBottom: 10 }}>APs</Text>
+        <Text style={{ fontSize: 17, fontWeight: '800', color: selected ? ORANGE : BLACK, letterSpacing: -0.5 }}>₹{price}</Text>
     </TouchableOpacity>
 );
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 const SubscriptionScreen = () => {
     const navigation = useNavigation<any>();
+    const route = useRoute<any>();
+    const scrollViewRef = useRef<ScrollView>(null);
+    const apSectionY = useRef(0);
     const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
+    const [selectedBundle, setSelectedBundle] = useState<number | null>(null);
 
     const titleY = useRef(new Animated.Value(40)).current;
     const titleOpacity = useRef(new Animated.Value(0)).current;
@@ -114,6 +119,12 @@ const SubscriptionScreen = () => {
                 Animated.timing(contentOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
             ]),
         ]).start();
+
+        if (route.params?.scrollToAP) {
+            setTimeout(() => {
+                scrollViewRef.current?.scrollTo({ y: apSectionY.current, animated: true });
+            }, 800);
+        }
     }, []);
 
     const miniPrice = billing === 'monthly' ? `₹${MINI_MONTHLY}` : `₹${MINI_YEARLY_MO}`;
@@ -137,7 +148,7 @@ const SubscriptionScreen = () => {
                     </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 60 }}>
+                <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 60 }}>
 
                     {/* ── Hero ── */}
                     <Animated.View style={{ opacity: titleOpacity, transform: [{ translateY: titleY }], marginTop: 8, marginBottom: 28 }}>
@@ -278,7 +289,10 @@ const SubscriptionScreen = () => {
                         </Text>
 
                         {/* ── AP Purchase Center ── */}
-                        <Text style={{ fontSize: 10, fontWeight: '800', color: 'rgba(0,0,0,0.35)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>
+                        <Text
+                            onLayout={(e) => { apSectionY.current = e.nativeEvent.layout.y; }}
+                            style={{ fontSize: 10, fontWeight: '800', color: 'rgba(0,0,0,0.35)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}
+                        >
                             AP PURCHASE CENTER
                         </Text>
                         <Text style={{ fontSize: 11, fontWeight: '500', color: 'rgba(0,0,0,0.4)', marginBottom: 16, lineHeight: 17 }}>
@@ -286,13 +300,32 @@ const SubscriptionScreen = () => {
                         </Text>
 
                         <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
-                            <APBundleCard {...AP_BUNDLES[0]} />
-                            <APBundleCard {...AP_BUNDLES[1]} />
+                            <APBundleCard {...AP_BUNDLES[0]} selected={selectedBundle === 0} onPress={() => setSelectedBundle(selectedBundle === 0 ? null : 0)} />
+                            <APBundleCard {...AP_BUNDLES[1]} selected={selectedBundle === 1} onPress={() => setSelectedBundle(selectedBundle === 1 ? null : 1)} />
                         </View>
-                        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 36 }}>
-                            <APBundleCard {...AP_BUNDLES[2]} />
-                            <APBundleCard {...AP_BUNDLES[3]} />
+                        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                            <APBundleCard {...AP_BUNDLES[2]} selected={selectedBundle === 2} onPress={() => setSelectedBundle(selectedBundle === 2 ? null : 2)} />
+                            <APBundleCard {...AP_BUNDLES[3]} selected={selectedBundle === 3} onPress={() => setSelectedBundle(selectedBundle === 3 ? null : 3)} />
                         </View>
+
+                        {selectedBundle !== null && (
+                            <TouchableOpacity
+                                activeOpacity={0.88}
+                                onPress={() => Alert.alert(
+                                    'Purchase APs',
+                                    `Buy ${AP_BUNDLES[selectedBundle].aps} APs for ₹${AP_BUNDLES[selectedBundle].price}?`,
+                                    [
+                                        { text: 'Cancel', style: 'cancel' },
+                                        { text: 'Purchase', onPress: () => { setSelectedBundle(null); navigation.goBack(); } },
+                                    ]
+                                )}
+                                style={{ backgroundColor: BLACK, borderRadius: 100, paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 20 }}
+                            >
+                                <Text style={{ fontSize: 13, fontWeight: '900', color: CREAM, letterSpacing: 2, textTransform: 'uppercase' }}>
+                                    PURCHASE {AP_BUNDLES[selectedBundle].aps} APs · ₹{AP_BUNDLES[selectedBundle].price}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
 
                         {/* ── Fine Print ── */}
                         <Text style={{ textAlign: 'center', fontSize: 10, fontWeight: '500', color: 'rgba(0,0,0,0.25)', letterSpacing: 0.5, lineHeight: 16 }}>

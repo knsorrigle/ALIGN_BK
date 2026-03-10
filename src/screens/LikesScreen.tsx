@@ -3,137 +3,60 @@ import { View, Text, ImageBackground, FlatList, TouchableOpacity, StyleSheet, Di
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useNavigation } from '@react-navigation/native';
-import { Zap } from 'lucide-react-native';
 import { BLACK, CREAM, ORANGE } from '../constants/colors';
-
-// ─── Dummy Data ─────────────────────────────────────────────────────────────
-// ─── Dummy Data ─────────────────────────────────────────────────────────────
-const LIKES_DATA = [
-    {
-        id: '1',
-        name: 'MAYA',
-        apCount: 4,
-        tier: 'Free',
-        timestamp: Date.now() - 1000 * 60 * 5, // 5 mins ago
-        photo: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&q=80',
-    },
-    {
-        id: '2',
-        name: 'JORDAN',
-        apCount: 20,
-        tier: 'Max',
-        timestamp: Date.now() - 1000 * 60 * 60, // 1 hour ago
-        photo: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=400&q=80',
-    },
-    {
-        id: '3',
-        name: 'ALEX',
-        apCount: 12,
-        tier: 'Mini',
-        timestamp: Date.now() - 1000 * 60 * 30, // 30 mins ago
-        photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80',
-    },
-    {
-        id: '4',
-        name: 'RILEY',
-        apCount: 5,
-        tier: 'Mini',
-        timestamp: Date.now() - 1000 * 60 * 15, // 15 mins ago
-        photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80',
-    },
-    {
-        id: '5',
-        name: 'SAGE',
-        apCount: 10,
-        tier: 'Max',
-        timestamp: Date.now() - 1000 * 60 * 120, // 2 hours ago
-        photo: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&q=80',
-    },
-    {
-        id: '6',
-        name: 'QUINN',
-        apCount: 0,
-        tier: 'Free',
-        timestamp: Date.now() - 1000 * 60 * 10, // 10 mins ago
-        photo: 'https://images.unsplash.com/photo-1488161628813-04466f872be2?w=400&q=80',
-    },
-];
+import { useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 
 const { width } = Dimensions.get('window');
 
-const LikeCard = ({ item, onViewProfile }: { item: typeof LIKES_DATA[0], onViewProfile: (user: typeof LIKES_DATA[0]) => void }) => {
+type LikeItem = {
+    _id: any;
+    clerkId: string;
+    name: string;
+    photos: string[];
+    swipedAt: number;
+};
+
+const LikeCard = ({ item, onViewProfile }: { item: LikeItem; onViewProfile: (item: LikeItem) => void }) => {
     const hoverAnim = React.useRef(new Animated.Value(0)).current;
 
     const handlePressIn = () => {
-        Animated.timing(hoverAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-        }).start();
+        Animated.timing(hoverAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
     };
 
     const handlePressOut = () => {
-        Animated.timing(hoverAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-        }).start();
+        Animated.timing(hoverAnim, { toValue: 0, duration: 300, useNativeDriver: true }).start();
     };
 
-    // Fades out the "grayscale" simulation
-    const grayscaleOpacity = hoverAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [1, 0],
-    });
-
-    // Fades in the dark gradient overlay for text legibility
     const darkOverlayOpacity = hoverAnim.interpolate({
         inputRange: [0, 1],
         outputRange: [0, 1],
     });
 
+    const photoUri = item.photos[0];
+
     return (
         <TouchableOpacity
             style={styles.card}
-            activeOpacity={1} // Disable default fade
+            activeOpacity={1}
             onPress={() => onViewProfile(item)}
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
         >
             <ImageBackground
-                source={{ uri: item.photo }}
+                source={photoUri ? { uri: photoUri } : undefined}
                 style={styles.image}
                 imageStyle={{ borderRadius: 32 }}
                 resizeMode="cover"
             >
-                {/* Dark overlay for text legibility that fades in */}
                 <Animated.View
                     style={[
                         StyleSheet.absoluteFillObject,
                         { backgroundColor: 'rgba(13, 13, 13, 0.2)', opacity: darkOverlayOpacity }
                     ]}
                 />
-
                 <View style={styles.overlay}>
-                    {/* Top Badges area */}
-                    <View style={{ position: 'absolute', bottom: 32, left: 0, flexDirection: 'row', gap: 6 }}>
-                        {/* Premium Badge */}
-                        {item.tier !== 'Free' && (
-                            <View style={[styles.badge, styles.tierBadge]}>
-                                <Text style={styles.tierText}>{item.tier}</Text>
-                            </View>
-                        )}
-
-                        {/* AP Badge */}
-                        {item.apCount > 0 && (
-                            <View style={styles.badge}>
-                                <Zap size={10} color={ORANGE} fill={ORANGE} />
-                                <Text style={styles.apText}>{item.apCount} APs</Text>
-                            </View>
-                        )}
-                    </View>
-
-                    <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.name} numberOfLines={1}>{item.name?.toUpperCase()}</Text>
                 </View>
             </ImageBackground>
         </TouchableOpacity>
@@ -143,28 +66,13 @@ const LikeCard = ({ item, onViewProfile }: { item: typeof LIKES_DATA[0], onViewP
 export default function LikesScreen() {
     const insets = useSafeAreaInsets();
     const navigation = useNavigation<any>();
+    const pendingLikes = useQuery(api.swipes.getPendingLikes);
 
-    const onViewProfile = (user: typeof LIKES_DATA[0]) => {
-        navigation.navigate('ProfileDetail', { userId: user.id });
+    const onViewProfile = (user: LikeItem) => {
+        navigation.navigate('ProfileDetail', { userId: user._id });
     };
 
-    const sortedLikes = React.useMemo(() => {
-        const tierWeights: Record<string, number> = { 'Max': 3, 'Mini': 2, 'Free': 1 };
-        return [...LIKES_DATA].sort((a, b) => {
-            // 1. Tier mapping Max -> Mini -> Free
-            if (tierWeights[a.tier] !== tierWeights[b.tier]) {
-                return tierWeights[b.tier] - tierWeights[a.tier];
-            }
-            // 2. AP count descending
-            if (a.apCount !== b.apCount) {
-                return b.apCount - a.apCount;
-            }
-            // 3. Most recent first
-            return b.timestamp - a.timestamp;
-        });
-    }, []);
-
-    const renderItem = ({ item }: { item: typeof LIKES_DATA[0] }) => (
+    const renderItem = ({ item }: { item: LikeItem }) => (
         <LikeCard item={item} onViewProfile={onViewProfile} />
     );
 
@@ -174,18 +82,43 @@ export default function LikesScreen() {
 
             <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 36 }}>
                 <Text style={styles.headline}>LIKES</Text>
+                {pendingLikes !== undefined && (
+                    <Text style={styles.countLabel}>{pendingLikes.length}</Text>
+                )}
             </View>
 
-            <Text style={styles.sortLabel}>SORTED BY INTEREST</Text>
-            <FlatList
-                data={sortedLikes}
-                renderItem={renderItem}
-                keyExtractor={(item) => item.id}
-                numColumns={2}
-                columnWrapperStyle={styles.row}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 120 }}
-            />
+            <Text style={styles.sortLabel}>MOST RECENT</Text>
+
+            {pendingLikes === undefined ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 14, color: 'rgba(13,13,13,0.4)', fontWeight: '600' }}>Loading...</Text>
+                </View>
+            ) : pendingLikes.length === 0 ? (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 24 }}>
+                    <Text style={{ fontSize: 16, color: 'rgba(13,13,13,0.4)', fontWeight: '600', textAlign: 'center' }}>
+                        No likes yet.{'\n'}Keep using Align!
+                    </Text>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('TabHome')}
+                        activeOpacity={0.85}
+                        style={{ backgroundColor: BLACK, borderRadius: 32, paddingVertical: 14, paddingHorizontal: 28 }}
+                    >
+                        <Text style={{ fontSize: 11, fontWeight: '900', color: CREAM, letterSpacing: 2, textTransform: 'uppercase' }}>
+                            GO TO HOME
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            ) : (
+                <FlatList
+                    data={pendingLikes}
+                    renderItem={renderItem}
+                    keyExtractor={(item) => item.clerkId}
+                    numColumns={2}
+                    columnWrapperStyle={styles.row}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingBottom: 120 }}
+                />
+            )}
         </View>
     );
 }
@@ -197,11 +130,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: 32,
     },
     headline: {
-        fontFamily: 'ArchivoBlack_400Regular', // Adapted from FONTS.display
-        fontSize: 64, // Adapted from the prompt
+        // fontFamily removed — ArchivoBlack not loaded
+        fontSize: 64,
         fontWeight: '900',
-        color: BLACK, // COLORS.ink
+        color: BLACK,
         letterSpacing: -2,
+    },
+    countLabel: {
+        fontSize: 24,
+        fontWeight: '900',
+        color: ORANGE,
+        letterSpacing: -1,
     },
     sortLabel: {
         fontSize: 10,
@@ -216,60 +155,31 @@ const styles = StyleSheet.create({
         marginBottom: 16,
     },
     card: {
-        width: (width - 64 - 16) / 2, // 47% equivalent with exact math (width - padding - gap)
+        width: (width - 64 - 16) / 2,
         aspectRatio: 3 / 4,
         borderRadius: 32,
         backgroundColor: '#FFFFFF',
         borderColor: 'rgba(13, 13, 13, 0.07)',
         borderWidth: 1,
-        marginBottom: 16, // Ensure gap between rows
+        marginBottom: 16,
         overflow: 'hidden',
     },
     image: {
         width: '100%',
         height: '100%',
-        justifyContent: 'flex-end', // Align overlay to bottom
+        justifyContent: 'flex-end',
     },
     overlay: {
         position: 'absolute',
         bottom: 24,
         left: 24,
-        right: 16, // prevent name clipping
+        right: 16,
     },
     name: {
-        fontFamily: 'ArchivoBlack_400Regular',
+        // fontFamily removed — ArchivoBlack not loaded
         fontSize: 24,
         color: '#FFFFFF',
         textTransform: 'uppercase',
         fontWeight: '900',
-    },
-    badge: {
-        backgroundColor: '#1A1A1A',
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 8,
-        paddingVertical: 5,
-        borderRadius: 100,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-    },
-    tierBadge: {
-        backgroundColor: '#FFFFFF',
-    },
-    tierText: {
-        fontSize: 9,
-        fontWeight: '900',
-        color: '#000000',
-        letterSpacing: 1.5,
-        textTransform: 'uppercase',
-        paddingBottom: 1,
-    },
-    apText: {
-        fontSize: 9,
-        fontWeight: '800',
-        color: CREAM,
-        letterSpacing: 1,
-        paddingBottom: 1,
     },
 });

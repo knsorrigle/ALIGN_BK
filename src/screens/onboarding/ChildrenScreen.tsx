@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { ORANGE } from '../../constants/colors';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
 
 const CHILDREN_OPTIONS = [
     'Want Them',
@@ -16,6 +17,7 @@ const CHILDREN_OPTIONS = [
 
 const ChildrenScreen = () => {
     const navigation = useNavigation<any>();
+    const saveField = useUpdateOnboarding();
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
     const titleTranslateY = useRef(new Animated.Value(50)).current;
@@ -117,7 +119,10 @@ const ChildrenScreen = () => {
 
                     <TouchableOpacity
                         className={`w-full py-4 rounded-full items-center active:scale-95 ${selectedOption ? 'bg-black' : 'bg-black/20'}`}
-                        onPress={() => navigation.navigate('DistancePreference')}
+                        onPress={async () => {
+                            if (selectedOption) await saveField({ children: selectedOption });
+                            navigation.navigate('DistancePreference');
+                        }}
                         disabled={!selectedOption}
                     >
                         <Text className={`text-base font-black uppercase ${selectedOption ? 'text-cream' : 'text-black/30'}`} style={{ letterSpacing: 2 }}>CONTINUE</Text>

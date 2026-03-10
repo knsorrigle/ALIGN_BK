@@ -32,7 +32,18 @@ export const saveProfilePhoto = mutation({
 
         const clerkId = identity.subject;
 
-        const newPhotoId = await ctx.db.insert("photos", {
+        // Replace any existing photo at this position
+        const existingPhotos = await ctx.db
+            .query("photos")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+            .collect();
+        const existing = existingPhotos.find(p => p.position === args.position);
+        if (existing) {
+            await ctx.storage.delete(existing.storageId);
+            await ctx.db.delete(existing._id);
+        }
+
+        await ctx.db.insert("photos", {
             clerkId,
             storageId: args.storageId,
             url,
@@ -40,7 +51,23 @@ export const saveProfilePhoto = mutation({
             createdAt: Date.now(),
         });
 
-        return newPhotoId;
+        // Sync user.photos array so AIMs and getProfileById see real URLs
+        const allPhotos = await ctx.db
+            .query("photos")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+            .collect();
+        allPhotos.sort((a, b) => a.position - b.position);
+        const photoUrls = allPhotos.map(p => p.url);
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+            .first();
+        if (user) {
+            await ctx.db.patch(user._id, { photos: photoUrls });
+        }
+
+        return url;
     },
 });
 
@@ -134,6 +161,22 @@ export const deletePhoto = mutation({
 
         // Delete from database
         await ctx.db.delete(args.photoId);
+
+        // Sync user.photos array
+        const remainingPhotos = await ctx.db
+            .query("photos")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+            .collect();
+        remainingPhotos.sort((a, b) => a.position - b.position);
+        const photoUrls = remainingPhotos.map(p => p.url);
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+            .first();
+        if (user) {
+            await ctx.db.patch(user._id, { photos: photoUrls });
+        }
 
         return true;
     },

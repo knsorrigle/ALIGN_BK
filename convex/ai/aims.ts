@@ -467,6 +467,14 @@ export const getMyAIMs = query({
                     .withIndex("by_clerkId", (q) => q.eq("clerkId", aim.targetClerkId))
                     .first();
                 if (!target) return null;
+                let photos = target.photos || [];
+                if (photos.length === 0) {
+                    const photoRows = await ctx.db
+                        .query("photos")
+                        .withIndex("by_clerkId", (q) => q.eq("clerkId", aim.targetClerkId))
+                        .collect();
+                    photos = photoRows.sort((a, b) => a.position - b.position).map((p) => p.url);
+                }
                 return {
                     _id: aim._id,
                     targetClerkId: aim.targetClerkId,
@@ -477,7 +485,7 @@ export const getMyAIMs = query({
                     expiresAt: aim.expiresAt,
                     target: {
                         firstName: target.firstName || target.name,
-                        photos: target.photos || [],
+                        photos,
                         location: target.location || "Nearby",
                         age: calculateAge(target.birthday),
                     },

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated, Easing, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated, Easing, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { X } from 'lucide-react-native';
 import { BLACK, CREAM, ORANGE } from '../constants/colors';
 
@@ -16,6 +16,8 @@ const REASONS = [
 
 const ReportScreen = () => {
     const navigation = useNavigation<any>();
+    const route = useRoute<any>();
+    const reportedName: string = route.params?.name ?? 'THIS USER';
     const [selectedReason, setSelectedReason] = useState<string | null>(null);
     const [note, setNote] = useState('');
 
@@ -61,7 +63,7 @@ const ReportScreen = () => {
                     </TouchableOpacity>
                     <View style={{ alignItems: 'flex-end' }}>
                         <Text style={{ fontSize: 9, fontWeight: '800', color: 'rgba(0,0,0,0.4)', letterSpacing: 2, textTransform: 'uppercase' }}>Reporting</Text>
-                        <Text style={{ fontSize: 11, fontWeight: '900', color: BLACK, letterSpacing: 1, textTransform: 'uppercase' }}>@ALEX_VANCE_92</Text>
+                        <Text style={{ fontSize: 11, fontWeight: '900', color: BLACK, letterSpacing: 1, textTransform: 'uppercase' }}>{reportedName}</Text>
                     </View>
                 </View>
 
@@ -152,7 +154,13 @@ const ReportScreen = () => {
 
                         {/* Submit */}
                         <TouchableOpacity
-                            onPress={() => navigation.goBack()}
+                            onPress={() => {
+                                Alert.alert(
+                                    'Report Submitted',
+                                    'Thank you. Our team will review this report within 24 hours.',
+                                    [{ text: 'OK', onPress: () => navigation.goBack() }]
+                                );
+                            }}
                             disabled={!selectedReason}
                             activeOpacity={0.85}
                             style={{

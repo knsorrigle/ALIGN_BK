@@ -1,13 +1,18 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, Animated, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BLACK, CREAM } from '../../constants/colors';
+import { useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { useUser } from '@clerk/expo';
 
 const OnboardingCompleteScreen = () => {
-    const navigation = useNavigation<any>();
     const insets = useSafeAreaInsets();
+    const { user } = useUser();
+    const completeOnboarding = useMutation(api.users.completeOnboarding);
+    const [isLoading, setIsLoading] = useState(false);
+
     const scaleAnim = useRef(new Animated.Value(0.8)).current;
     const opacityAnim = useRef(new Animated.Value(0)).current;
 
@@ -17,6 +22,19 @@ const OnboardingCompleteScreen = () => {
             Animated.timing(opacityAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
         ]).start();
     }, []);
+
+    const handleEnter = async () => {
+        if (!user || isLoading) return;
+        try {
+            setIsLoading(true);
+            await completeOnboarding({ clerkId: user.id });
+            // RootNavigator will automatically re-render and route to MainApp
+            // when it detects currentUser.onboardingCompleted === true
+        } catch (err) {
+            console.error('completeOnboarding error:', err);
+            setIsLoading(false);
+        }
+    };
 
     return (
         <View style={{ flex: 1, backgroundColor: CREAM, alignItems: 'center', justifyContent: 'center', paddingTop: insets.top }}>
@@ -36,10 +54,14 @@ const OnboardingCompleteScreen = () => {
 
             <View style={{ position: 'absolute', bottom: insets.bottom + 24, left: 32, right: 32 }}>
                 <TouchableOpacity
-                    onPress={() => navigation.reset({ index: 0, routes: [{ name: 'MainApp' }] })}
-                    style={{ backgroundColor: BLACK, paddingVertical: 16, borderRadius: 32, alignItems: 'center' }}
+                    onPress={handleEnter}
+                    disabled={isLoading}
+                    style={{ backgroundColor: BLACK, paddingVertical: 16, borderRadius: 32, alignItems: 'center', opacity: isLoading ? 0.7 : 1 }}
                 >
-                    <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' }}>Enter Align</Text>
+                    {isLoading
+                        ? <ActivityIndicator size="small" color="#FFFFFF" />
+                        : <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '900', letterSpacing: 1, textTransform: 'uppercase' }}>Enter Align</Text>
+                    }
                 </TouchableOpacity>
             </View>
         </View>

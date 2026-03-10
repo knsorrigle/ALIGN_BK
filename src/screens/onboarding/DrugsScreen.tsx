@@ -4,11 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { BLACK, CREAM, ORANGE } from '../../constants/colors';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
 
 const DRUG_OPTIONS = ['Frequently', 'Socially', 'Rarely', 'Never'];
 
 const DrugsScreen = () => {
     const navigation = useNavigation<any>();
+    const saveField = useUpdateOnboarding();
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
     const contentOpacity = useRef(new Animated.Value(0)).current;
 
@@ -78,7 +80,10 @@ const DrugsScreen = () => {
                 {/* Continue */}
                 <View style={{ paddingHorizontal: 32, paddingBottom: 8 }}>
                     <TouchableOpacity
-                        onPress={() => navigation.navigate('Politics')}
+                        onPress={async () => {
+                            if (selectedOption) await saveField({ drugs: selectedOption });
+                            navigation.navigate('Politics');
+                        }}
                         disabled={!selectedOption}
                         style={{
                             paddingVertical: 16,

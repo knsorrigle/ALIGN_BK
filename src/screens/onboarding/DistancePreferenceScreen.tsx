@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { BLACK, CREAM, ORANGE } from '../../constants/colors';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
 
 const DISTANCE_OPTIONS = [
     { id: 'open', label: 'Open To It', description: 'Match with people anywhere' },
@@ -12,6 +13,7 @@ const DISTANCE_OPTIONS = [
 
 const DistancePreferenceScreen = () => {
     const navigation = useNavigation<any>();
+    const saveField = useUpdateOnboarding();
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
     const titleTranslateX = useRef(new Animated.Value(-60)).current;
@@ -119,7 +121,10 @@ const DistancePreferenceScreen = () => {
                 {/* Footer */}
                 <View className="px-6 pb-10 pt-4">
                     <TouchableOpacity
-                        onPress={() => navigation.navigate('IdUpload')}
+                        onPress={async () => {
+                            if (selectedOption) await saveField({ distancePreference: selectedOption });
+                            navigation.navigate('IdUpload');
+                        }}
                         disabled={!selectedOption}
                         className={`py-4 rounded-full items-center ${selectedOption ? 'bg-black' : 'bg-black/10'}`}
                     >

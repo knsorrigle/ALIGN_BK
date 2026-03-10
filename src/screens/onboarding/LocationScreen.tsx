@@ -1,13 +1,22 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, Animated, Easing, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Animated, Easing, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import * as Location from 'expo-location';
 import { ORANGE } from '../../constants/colors';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
+import { useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { useUser } from '@clerk/expo';
 
 const LocationScreen = () => {
     const navigation = useNavigation<any>();
+    const saveField = useUpdateOnboarding();
+    const updateUserLocation = useMutation(api.users.updateUserLocation);
+    const { user } = useUser();
     const [location, setLocation] = useState('');
+    const [isDetecting, setIsDetecting] = useState(false);
 
     const titleTranslateY = useRef(new Animated.Value(-100)).current;
     const contentOpacity = useRef(new Animated.Value(0)).current;
@@ -36,6 +45,43 @@ const LocationScreen = () => {
             ])
         ).start();
     }, []);
+
+    const handleUseCurrentLocation = async () => {
+        setIsDetecting(true);
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                setIsDetecting(false);
+                return;
+            }
+            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            const [geo] = await Location.reverseGeocodeAsync({
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+            });
+            const city = geo.city || geo.subregion || '';
+            const region = geo.region || '';
+            const country = geo.country || '';
+            const display = city && region ? `${city}, ${region}` : city || region || country;
+            setLocation(display);
+            if (user?.id) {
+                await updateUserLocation({
+                    clerkId: user.id,
+                    city,
+                    region,
+                    country,
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                });
+            }
+        } catch {
+            // silently fail — user can type manually
+        } finally {
+            setIsDetecting(false);
+        }
+    };
+
+    const isReady = location.trim().length > 0;
 
     return (
         <View className="flex-1 bg-cream relative overflow-hidden">
@@ -117,9 +163,18 @@ const LocationScreen = () => {
                             </View>
                         </View>
 
-                        <TouchableOpacity className="flex-row items-center gap-2">
-                            <MaterialIcons name="near-me" size={16} color={ORANGE} />
-                            <Text className="text-primary font-black text-xs uppercase" style={{ letterSpacing: 1 }}>Use current location</Text>
+                        <TouchableOpacity
+                            className="flex-row items-center gap-2"
+                            onPress={handleUseCurrentLocation}
+                            disabled={isDetecting}
+                        >
+                            {isDetecting
+                                ? <ActivityIndicator size="small" color={ORANGE} />
+                                : <MaterialIcons name="near-me" size={16} color={ORANGE} />
+                            }
+                            <Text className="text-primary font-black text-xs uppercase" style={{ letterSpacing: 1 }}>
+                                {isDetecting ? 'Detecting...' : 'Use current location'}
+                            </Text>
                         </TouchableOpacity>
                     </Animated.View>
                 </KeyboardAvoidingView>
@@ -127,10 +182,14 @@ const LocationScreen = () => {
                 {/* Continue Button */}
                 <View className="px-8 pb-10">
                     <TouchableOpacity
-                        className="bg-black py-4 rounded-full w-full items-center active:scale-95"
-                        onPress={() => navigation.navigate('IntroStatement')}
+                        className={`py-4 rounded-full w-full items-center active:scale-95 ${isReady ? 'bg-black' : 'bg-black/20'}`}
+                        disabled={!isReady}
+                        onPress={async () => {
+                            if (isReady) await saveField({ location: location.trim() });
+                            navigation.navigate('IntroStatement');
+                        }}
                     >
-                        <Text className="text-cream text-base font-black uppercase" style={{ letterSpacing: 2 }}>Continue</Text>
+                        <Text className={`text-base font-black uppercase ${isReady ? 'text-cream' : 'text-black/30'}`} style={{ letterSpacing: 2 }}>Continue</Text>
                     </TouchableOpacity>
                 </View>
 

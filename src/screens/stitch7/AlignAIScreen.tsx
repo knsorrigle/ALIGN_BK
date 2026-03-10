@@ -10,12 +10,16 @@ import {
     Platform,
     Animated,
     Dimensions,
+    Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BLACK, CREAM, ORANGE } from '../../constants/colors';
 import { useNavigation } from '@react-navigation/native';
+import { useQuery, useAction } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
+import { Audio } from 'expo-av';
 
 const INITIAL_PROMPTS = [
     "How do I rizz them up?",
@@ -147,11 +151,89 @@ const ChatBubble = ({ message, isLast }: { message: Message; isLast: boolean }) 
 
 export default function AlignAIScreen() {
     const insets = useSafeAreaInsets();
-    const navigation = useNavigation();
+    const navigation = useNavigation<any>();
+    const canGoBack = navigation.canGoBack();
+    const history = useQuery(api.ai.chat.getMyAIChatHistory);
+    const sendMessageAction = useAction(api.ai.chat.sendMessage);
 
-    const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
+    const recordingRef = useRef<Audio.Recording | null>(null);
+    const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const stopRecording = async () => {
+        if (recordingTimerRef.current) {
+            clearTimeout(recordingTimerRef.current);
+            recordingTimerRef.current = null;
+        }
+        setIsRecording(false);
+        if (!recordingRef.current) return;
+        let uri: string | null = null;
+        try {
+            uri = recordingRef.current.getURI();
+            await recordingRef.current.stopAndUnloadAsync();
+        } catch { /* already stopped */ }
+        recordingRef.current = null;
+        if (!uri) return;
+        try {
+            const formData = new FormData();
+            formData.append('file', { uri, type: 'audio/m4a', name: 'recording.m4a' } as any);
+            formData.append('model', 'whisper-large-v3');
+            const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${process.env.EXPO_PUBLIC_GROQ_API_KEY}` },
+                body: formData,
+            });
+            if (!response.ok) throw new Error('Transcription failed');
+            const data = await response.json();
+            const transcribed = (data.text || '').trim();
+            if (!transcribed || isTyping) return;
+            // Auto-send transcribed text
+            setIsTyping(true);
+            setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+            try {
+                await sendMessageAction({ text: transcribed });
+            } finally {
+                setIsTyping(false);
+                setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+            }
+        } catch {
+            Alert.alert('Voice input failed', 'Could not transcribe audio. Please type your message instead.');
+        }
+    };
+
+    const handleMicPress = async () => {
+        if (isRecording) {
+            await stopRecording();
+            return;
+        }
+        const { status } = await Audio.requestPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Microphone Permission', 'Please allow microphone access to use voice input.');
+            return;
+        }
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+        const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+        recordingRef.current = recording;
+        setIsRecording(true);
+        recordingTimerRef.current = setTimeout(() => stopRecording(), 10000);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (recordingRef.current) {
+                recordingRef.current.stopAndUnloadAsync().catch(() => { });
+            }
+            if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+        };
+    }, []);
+
+    const messages: Message[] = (history ?? []).map(m => ({
+        id: String(m._id),
+        text: m.text,
+        isAi: m.isAi,
+    }));
 
     const scrollViewRef = useRef<ScrollView>(null);
     const screenOpacity = useRef(new Animated.Value(0)).current;
@@ -164,42 +246,29 @@ export default function AlignAIScreen() {
         ]).start();
     }, []);
 
-    const handleSend = (text: string) => {
-        if (!text.trim()) return;
-
-        const userMsg: Message = { id: Date.now().toString(), text, isAi: false };
-        setMessages(prev => [...prev, userMsg]);
+    const handleSend = async (text: string) => {
+        if (!text.trim() || isTyping) return;
         setInputText('');
         setIsTyping(true);
-
-        setTimeout(() => {
-            scrollViewRef.current?.scrollToEnd({ animated: true });
-        }, 100);
-
-        // Mock AI response
-        setTimeout(() => {
+        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+        try {
+            await sendMessageAction({ text: text.trim() });
+        } finally {
             setIsTyping(false);
-            const aiMsg: Message = {
-                id: (Date.now() + 1).toString(),
-                text: "Here is your personalized dating strategy: Be yourself, ask questions, and suggest a coffee shop date. It's low-pressure and easy to connect!",
-                isAi: true
-            };
-            setMessages(prev => [...prev, aiMsg]);
-
-            setTimeout(() => {
-                scrollViewRef.current?.scrollToEnd({ animated: true });
-            }, 100);
-        }, 1500);
+            setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+        }
     };
 
     return (
         <Animated.View style={[styles.root, { opacity: screenOpacity, transform: [{ translateY: screenTranslateY }] }]}>
             <StatusBar style="dark" />
             <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-                {/* Back Button for Stack (if pushed) */}
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="chevron-back" size={24} color={BLACK} />
-                </TouchableOpacity>
+                {/* Back Button for Stack (only when pushed, not tab root) */}
+                {canGoBack && (
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                        <Ionicons name="chevron-back" size={24} color={BLACK} />
+                    </TouchableOpacity>
+                )}
 
                 <View style={styles.titleRow}>
                     <MaterialCommunityIcons name="star-four-points-outline" size={24} color={ORANGE} />
@@ -248,7 +317,9 @@ export default function AlignAIScreen() {
 
                 <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 24) }]}>
                     <View style={styles.inputPill}>
-                        <Ionicons name="mic" size={20} color="rgba(13,13,13,0.4)" style={styles.inputIcon} />
+                        <TouchableOpacity onPress={handleMicPress} style={styles.inputIcon}>
+                            <Ionicons name={isRecording ? 'stop-circle' : 'mic'} size={20} color={isRecording ? ORANGE : 'rgba(13,13,13,0.4)'} />
+                        </TouchableOpacity>
                         <TextInput
                             style={styles.inputField}
                             placeholder="ASK ALIGN ANYTHING..."
@@ -306,7 +377,7 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     headline: {
-        fontFamily: 'ArchivoBlack_400Regular',
+        // fontFamily removed — ArchivoBlack not loaded
         fontSize: 48, // text-5xl equivalent roughly
         fontWeight: '900',
         color: BLACK,

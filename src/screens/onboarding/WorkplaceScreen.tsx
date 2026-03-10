@@ -3,9 +3,11 @@ import { View, Text, TouchableOpacity, TextInput, Animated, Easing, KeyboardAvoi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
 
 const WorkplaceScreen = () => {
     const navigation = useNavigation<any>();
+    const saveField = useUpdateOnboarding();
     const [jobTitle, setJobTitle] = useState('');
     const [company, setCompany] = useState('');
 
@@ -30,7 +32,11 @@ const WorkplaceScreen = () => {
         ]).start();
     }, []);
 
-    const handleContinue = () => {
+    const handleContinue = async () => {
+        const workplace = jobTitle && company
+            ? `${jobTitle.trim()} at ${company.trim()}`
+            : (company.trim() || jobTitle.trim() || null);
+        if (workplace) await saveField({ workplace });
         navigation.navigate('ProfilePrompts');
     };
 

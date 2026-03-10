@@ -64,17 +64,13 @@ const IntroStatementScreen = () => {
                             YOU'RE
                         </Animated.Text>
 
-                        <Animated.View style={{ opacity: opacity2 }} className="relative -mt-6">
-                            {/* Shadow/Ghost layer */}
-                            <Text className="absolute top-1 left-1 text-[64px] font-black leading-[0.9] text-primary/10 -z-10" style={{ letterSpacing: -6 }}>
-                                ONE OF
-                            </Text>
+                        <Animated.View style={{ opacity: opacity2 }} className="relative">
                             <Text className="text-[64px] font-black leading-[0.9] text-black" style={{ letterSpacing: -6 }}>
                                 ONE OF
                             </Text>
                         </Animated.View>
 
-                        <Animated.View style={{ opacity: opacity3 }} className="relative -mt-6">
+                        <Animated.View style={{ opacity: opacity3 }} className="relative">
                             <Text className="text-[82px] font-black leading-[0.9] text-black" style={{ letterSpacing: -8 }}>
                                 A KIND
                             </Text>

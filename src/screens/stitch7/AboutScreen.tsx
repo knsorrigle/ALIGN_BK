@@ -3,27 +3,32 @@ import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { BLACK, ORANGE } from '../../constants/colors';
 
 export default function AboutScreen() {
     const insets = useSafeAreaInsets();
+    const navigation = useNavigation<any>();
     const watermarkText = "ABOUT · ALIGN · REAL · VERIFIED · TRUST · v1".repeat(20);
 
     return (
         <View className="flex-1 bg-cream relative">
             <StatusBar style="dark" />
 
-            {/* Explicit Watermark as per design (repeated exact line) */}
-            <View className="absolute inset-0 pointer-events-none opacity-10 p-4 overflow-hidden">
+            {/* Watermark — full-screen background, very subtle */}
+            <View
+                pointerEvents="none"
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.04, zIndex: 0, padding: 16, overflow: 'hidden' }}
+            >
                 <Text className="text-ink text-6xl font-black uppercase leading-none" style={{ letterSpacing: -1 }}>
                     {watermarkText}
                 </Text>
             </View>
 
-            <View style={{ paddingTop: insets.top }} className="flex-1 relative z-10 px-6">
+            <View style={{ paddingTop: insets.top, zIndex: 1, flex: 1, paddingHorizontal: 24 }}>
                 {/* Header */}
                 <View className="py-6 flex-row justify-between items-center">
-                    <TouchableOpacity>
+                    <TouchableOpacity onPress={() => navigation.goBack()}>
                         <Ionicons name="arrow-back" size={24} color={BLACK} />
                     </TouchableOpacity>
                     <View className="flex-row items-center gap-2">
@@ -58,7 +63,7 @@ export default function AboutScreen() {
                 {/* Footer */}
                 <View className="absolute bottom-0 left-0 w-full p-6 flex-row justify-between items-end bg-cream/50">
                     <View className="max-w-[70%]">
-                        <Text className="text-ink text-[10px]st uppercase font-bold leading-relaxed" style={{ letterSpacing: 1 }}>
+                        <Text className="text-ink text-[10px] uppercase font-bold leading-relaxed" style={{ letterSpacing: 1 }}>
                             DESIGNED WITH INTENTION.{'\n'}BANGALORE / DELHI / MUMBAI.
                         </Text>
                     </View>

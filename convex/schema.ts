@@ -11,10 +11,10 @@ export default defineSchema({
         // Core Identity (optional initially, filled during onboarding)
         firstName: v.optional(v.string()),
         birthday: v.optional(v.string()),
-        gender: v.optional(v.string()),
-        sexuality: v.optional(v.string()),
-        relationshipType: v.optional(v.string()),
-        datingIntention: v.optional(v.string()),
+        gender: v.optional(v.union(v.string(), v.null())),
+        sexuality: v.optional(v.union(v.string(), v.null())),
+        relationshipType: v.optional(v.union(v.string(), v.null())),
+        datingIntention: v.optional(v.union(v.string(), v.null())),
 
         // Optional Identity
         pronouns: v.optional(v.union(v.array(v.string()), v.null())),
@@ -54,6 +54,9 @@ export default defineSchema({
             answer: v.string()
         })), v.null())),
 
+        // Favorites (max 3 clerkIds)
+        favorites: v.optional(v.array(v.string())),
+
         onboardingCompleted: v.boolean(),
         verificationStatus: v.optional(v.union(v.literal("none"), v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
         createdAt: v.number(),
@@ -91,6 +94,7 @@ export default defineSchema({
         fromClerkId: v.string(),
         toClerkId: v.string(),
         direction: v.union(v.literal("left"), v.literal("right")),
+        introMessage: v.optional(v.string()),
         createdAt: v.number(),
     })
         .index("by_from", ["fromClerkId"])

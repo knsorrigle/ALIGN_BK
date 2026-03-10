@@ -113,14 +113,12 @@ export const deleteCurrentAccount = mutation({
 
         const clerkId = identity.subject;
 
-        // M6: Set pendingDeletion flag first to prevent duplicate runs
+        // Check if user exists before attempting deletion
         const existingUserCheck = await ctx.db
             .query("users")
             .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
             .first();
         if (!existingUserCheck) return true; // already deleted
-        if (existingUserCheck.pendingDeletion) return true; // deletion already in progress
-        await ctx.db.patch(existingUserCheck._id, { pendingDeletion: true });
 
         // ── Storage-backed tables (delete storage objects first) ──────────────
 
@@ -129,7 +127,7 @@ export const deleteCurrentAccount = mutation({
             .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
             .collect();
         for (const photo of photos) {
-            await ctx.storage.delete(photo.storageId);
+            try { await ctx.storage.delete(photo.storageId); } catch { /* stale storage id, skip */ }
             await ctx.db.delete(photo._id);
         }
 
@@ -138,7 +136,7 @@ export const deleteCurrentAccount = mutation({
             .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
             .collect();
         for (const voice of voices) {
-            await ctx.storage.delete(voice.storageId);
+            try { await ctx.storage.delete(voice.storageId); } catch { /* stale storage id, skip */ }
             await ctx.db.delete(voice._id);
         }
 
@@ -147,7 +145,7 @@ export const deleteCurrentAccount = mutation({
             .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
             .collect();
         for (const verification of verifications) {
-            await ctx.storage.delete(verification.verificationPhotoStorageId);
+            try { await ctx.storage.delete(verification.verificationPhotoStorageId); } catch { /* stale storage id, skip */ }
             await ctx.db.delete(verification._id);
         }
 
@@ -460,6 +458,15 @@ export const getProfileById = query({
             .withIndex("by_clerkId", (q) => q.eq("clerkId", user.clerkId))
             .first();
 
+        let photos = user.photos || [];
+        if (photos.length === 0) {
+            const photoRows = await ctx.db
+                .query("photos")
+                .withIndex("by_clerkId", (q) => q.eq("clerkId", user.clerkId))
+                .collect();
+            photos = photoRows.sort((a, b) => a.position - b.position).map((p) => p.url);
+        }
+
         return {
             clerk_id: user.clerkId,
             name: user.firstName || user.name,
@@ -484,7 +491,7 @@ export const getProfileById = query({
             gender: user.gender || null,
             height: user.height || null,
             verificationStatus: user.verificationStatus || "none",
-            photos: user.photos || [],
+            photos,
             prompts: user.prompts?.map((p, i) => ({
                 id: String(p.id ?? i),
                 prompt_question: p.question,
@@ -659,12 +666,20 @@ export const getAllDiscoveryProfiles = query({
                     .withIndex("by_pair", (q) => q.eq("user1ClerkId", u1).eq("user2ClerkId", u2))
                     .first();
 
+                let photos = user.photos || [];
+                if (photos.length === 0) {
+                    const photoRows = await ctx.db
+                        .query("photos")
+                        .withIndex("by_clerkId", (q) => q.eq("clerkId", user.clerkId))
+                        .collect();
+                    photos = photoRows.sort((a, b) => a.position - b.position).map((p) => p.url);
+                }
                 return {
                     _id: user._id,
                     clerkId: user.clerkId,
                     firstName: user.firstName || user.name,
                     age: calculateAge(user.birthday),
-                    photos: user.photos || [],
+                    photos,
                     location: user.location || "Nearby",
                     prompts: user.prompts || [],
                     bio: user.publicBio || "",
@@ -686,11 +701,9 @@ export const getDiscoveryProfiles = query({
             .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
             .first();
 
-        if (!currentUser || !currentUser.gender) return [];
+        if (!currentUser) return [];
 
         const myClerkId = identity.subject;
-        const gender = currentUser.gender.toLowerCase();
-        const sexuality = currentUser.sexuality?.toLowerCase() || "";
         const excludedUserIds = new Set(args.excludedIds || []);
 
         // Exclude all users the current user has already swiped on
@@ -700,21 +713,7 @@ export const getDiscoveryProfiles = query({
             .collect();
         const swipedClerkIds = new Set(mySwipes.map((s) => s.toClerkId));
 
-        // Determine who to show based on gender + sexuality
-        // null = no gender filter (show everyone)
-        let targetGenders: string[] | null;
-        if (sexuality === "gay" || sexuality === "lesbian" || sexuality === "homosexual") {
-            targetGenders = [gender];
-        } else if (sexuality === "straight" || sexuality === "heterosexual") {
-            if (gender === "man") targetGenders = ["woman"];
-            else if (gender === "woman") targetGenders = ["man"];
-            else targetGenders = null; // non-binary + straight → show everyone
-        } else {
-            // bisexual, pansexual, queer, or unset → show everyone
-            targetGenders = null;
-        }
-
-        // Over-fetch to account for swipe + id exclusions applied in JS
+        // Fetch all onboarded users except current user
         const candidates = await ctx.db
             .query("users")
             .filter((q) =>
@@ -729,7 +728,6 @@ export const getDiscoveryProfiles = query({
             .filter((u) => {
                 if (swipedClerkIds.has(u.clerkId)) return false;
                 if (excludedUserIds.has(u._id)) return false;
-                if (targetGenders !== null && !targetGenders.includes(u.gender?.toLowerCase() ?? "")) return false;
                 return true;
             })
             .slice(0, 10);
@@ -746,12 +744,20 @@ export const getDiscoveryProfiles = query({
                     .withIndex("by_pair", (q) => q.eq("user1ClerkId", u1).eq("user2ClerkId", u2))
                     .first();
 
+                let photos = user.photos || [];
+                if (photos.length === 0) {
+                    const photoRows = await ctx.db
+                        .query("photos")
+                        .withIndex("by_clerkId", (q) => q.eq("clerkId", user.clerkId))
+                        .collect();
+                    photos = photoRows.sort((a, b) => a.position - b.position).map((p) => p.url);
+                }
                 return {
                     _id: user._id,
                     clerkId: user.clerkId,
                     firstName: user.firstName || user.name,
                     age: calculateAge(user.birthday),
-                    photos: user.photos || [],
+                    photos,
                     location: user.location || "Nearby",
                     prompts: user.prompts || [],
                     bio: user.publicBio || "",
@@ -764,18 +770,107 @@ export const getDiscoveryProfiles = query({
     },
 });
 
-function calculateAge(birthday: string | undefined) {
+function calculateAge(birthday: string | undefined): number {
     if (!birthday) return 0;
     try {
         const birthDate = new Date(birthday);
+        if (isNaN(birthDate.getTime())) return 0;
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
         const m = today.getMonth() - birthDate.getMonth();
         if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
             age--;
         }
-        return age;
-    } catch (e) {
+        return isNaN(age) ? 0 : age;
+    } catch {
         return 0;
     }
 }
+
+// ─── Favorites ────────────────────────────────────────────────────────────────
+
+export const addFavorite = mutation({
+    args: { targetClerkId: v.string() },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthenticated");
+        const myClerkId = identity.subject;
+        if (myClerkId === args.targetClerkId) throw new Error("Cannot favorite yourself");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", myClerkId))
+            .first();
+        if (!user) throw new Error("User not found");
+
+        const current = user.favorites ?? [];
+        if (current.includes(args.targetClerkId)) return { ok: true, count: current.length };
+        if (current.length >= 3) {
+            return { ok: false, count: current.length, error: "MAX_FAVORITES" };
+        }
+
+        await ctx.db.patch(user._id, { favorites: [...current, args.targetClerkId] });
+        return { ok: true, count: current.length + 1 };
+    },
+});
+
+export const removeFavorite = mutation({
+    args: { targetClerkId: v.string() },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) throw new Error("Unauthenticated");
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+            .first();
+        if (!user) throw new Error("User not found");
+
+        const current = user.favorites ?? [];
+        const updated = current.filter((id) => id !== args.targetClerkId);
+        await ctx.db.patch(user._id, { favorites: updated });
+        return { ok: true, count: updated.length };
+    },
+});
+
+export const getMyFavorites = query({
+    args: {},
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) return [];
+
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+            .first();
+        if (!user) return [];
+
+        const favClerkIds = user.favorites ?? [];
+        if (favClerkIds.length === 0) return [];
+
+        const enriched = await Promise.all(
+            favClerkIds.map(async (clerkId) => {
+                const favUser = await ctx.db
+                    .query("users")
+                    .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+                    .first();
+                if (!favUser) return null;
+                let photos = favUser.photos ?? [];
+                if (photos.length === 0) {
+                    const photoRows = await ctx.db
+                        .query("photos")
+                        .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
+                        .collect();
+                    photos = photoRows.sort((a, b) => a.position - b.position).map((p) => p.url);
+                }
+                return {
+                    clerkId: favUser.clerkId,
+                    firstName: favUser.firstName || favUser.name,
+                    photos,
+                };
+            })
+        );
+        return enriched.filter((u): u is NonNullable<typeof u> => u !== null);
+    },
+});
+

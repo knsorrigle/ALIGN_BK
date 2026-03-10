@@ -8,11 +8,15 @@ const ProfileStartScreen = () => {
     const navigation = useNavigation<any>();
     const titleOpacity = useRef(new Animated.Value(0)).current;
     const buttonTranslateY = useRef(new Animated.Value(50)).current;
+    const buttonOpacity = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         Animated.stagger(200, [
             Animated.timing(titleOpacity, { toValue: 1, duration: 800, useNativeDriver: true }),
-            Animated.timing(buttonTranslateY, { toValue: 0, duration: 800, useNativeDriver: true }),
+            Animated.parallel([
+                Animated.timing(buttonTranslateY, { toValue: 0, duration: 800, useNativeDriver: true }),
+                Animated.timing(buttonOpacity, { toValue: 1, duration: 600, useNativeDriver: true }),
+            ]),
         ]).start();
     }, []);
 
@@ -33,7 +37,7 @@ const ProfileStartScreen = () => {
                     </Animated.View>
                 </View>
 
-                <Animated.View style={{ transform: [{ translateY: buttonTranslateY }] }}>
+                <Animated.View style={{ transform: [{ translateY: buttonTranslateY }], opacity: buttonOpacity }}>
                     <TouchableOpacity
                         onPress={() => navigation.navigate('Pronouns')}
                         style={{ backgroundColor: BLACK, paddingVertical: 16, borderRadius: 32, alignItems: 'center' }}

@@ -4,11 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { ORANGE } from '../../constants/colors';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
 
 const genders = ['Man', 'Woman', 'Nonbinary'];
 
 const GenderScreen = () => {
     const navigation = useNavigation<any>();
+    const saveField = useUpdateOnboarding();
     const [selectedGender, setSelectedGender] = useState<string | null>(null);
 
     const titleTranslateY = useRef(new Animated.Value(-100)).current;
@@ -96,7 +98,10 @@ const GenderScreen = () => {
                 <View className="px-6 pb-10">
                     <TouchableOpacity
                         className={`py-4 rounded-full w-full items-center active:scale-95 ${selectedGender ? 'bg-black' : 'bg-black/20'}`}
-                        onPress={() => navigation.navigate('Location')}
+                        onPress={async () => {
+                            if (selectedGender) await saveField({ gender: selectedGender.toLowerCase() });
+                            navigation.navigate('Location');
+                        }}
                         disabled={!selectedGender}
                     >
                         <Text className={`text-base font-black uppercase ${selectedGender ? 'text-cream' : 'text-black/30'}`} style={{ letterSpacing: 2 }}>Continue</Text>

@@ -16,22 +16,9 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { BLACK, CREAM, ORANGE } from '../constants/colors';
-
-// ─── Dummy Data ───────────────────────────────────────────────────────────────
-const MY_PROMPTS = [
-    {
-        question: "My most controversial opinion is...",
-        answer: "New York pizza is good, but a heavily engineered Neapolitan pie is objectively superior in every way.",
-    },
-    {
-        question: "I geek out on...",
-        answer: "Typography, mechanical keyboards, and finding the theoretical perfect cup of coffee.",
-    },
-    {
-        question: "A non-negotiable for me is...",
-        answer: "A solid sleep schedule and the ability to laugh at absolutely awful movies.",
-    },
-];
+import { useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import { useAuth } from '@clerk/expo';
 
 // ─── UI Components ────────────────────────────────────────────────────────────
 function SectionLabel({ text }: { text: string }) {
@@ -55,7 +42,7 @@ const MENU_ITEMS: {
         { icon: 'card-outline', label: 'SUBSCRIPTION & BILLING', route: 'Subscription' },
         { icon: 'settings-outline', label: 'ACCOUNT SETTINGS', route: 'Settings' },
         { icon: 'shield-outline', label: 'PRIVACY & SAFETY' },
-        { icon: 'log-out-outline', label: 'SIGN OUT' },
+        { icon: 'log-out-outline', label: 'SIGN OUT', route: 'SignOut' },
     ];
 
 // ─── Animated menu row ────────────────────────────────────────────────────────
@@ -118,10 +105,21 @@ function MenuItem({
 export default function MyProfileScreen() {
     const insets = useSafeAreaInsets();
     const navigation = useNavigation<any>();
+    const { signOut } = useAuth();
+    const currentUser = useQuery(api.users.getCurrentUser);
+    const photos = useQuery(api.files.getUserPhotos);
 
     const handleMenu = (route?: string) => {
+        if (route === 'SignOut') {
+            signOut();
+            return;
+        }
         if (route) navigation.navigate(route as never);
     };
+
+    const displayName = (currentUser?.firstName ?? currentUser?.name ?? '').toUpperCase();
+    const avatarUri = photos?.[0]?.url ?? undefined;
+    const prompts = currentUser?.prompts ?? [];
 
     return (
         <View style={[styles.root, { backgroundColor: CREAM }]}>
@@ -133,15 +131,16 @@ export default function MyProfileScreen() {
             >
                 {/* ── Header ─────────────────────────────────────────────── */}
                 <View style={styles.header}>
-                    <Text style={[styles.headline, { color: BLACK }]} allowFontScaling={false}>
-                        ALEX{'\n'}RIVERA.
+                    <Text style={[styles.headline, { color: BLACK }]} adjustsFontSizeToFit numberOfLines={1} minimumFontScale={0.5}>
+                        {displayName || '...'}
                     </Text>
-                    {/* Circular avatar — greyscale tint via Image tintColor workaround */}
+                    {/* Circular avatar */}
                     <View style={styles.avatarRing}>
-                        <Image
-                            source={{ uri: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80' }}
-                            style={styles.avatarImg}
-                        />
+                        {avatarUri ? (
+                            <Image source={{ uri: avatarUri }} style={styles.avatarImg} />
+                        ) : (
+                            <View style={[styles.avatarImg, { backgroundColor: '#E0E0E0' }]} />
+                        )}
                     </View>
                 </View>
 
@@ -151,9 +150,9 @@ export default function MyProfileScreen() {
                     <View style={styles.apTopRow}>
                         <View>
                             <Text style={styles.apLabel}>AlignPoints</Text>
-                            <Text style={styles.apBalance}>2,840</Text>
+                            <Text style={styles.apBalance}>0</Text>
                         </View>
-                        <TouchableOpacity style={[styles.buyBtn, { backgroundColor: CREAM }]} activeOpacity={0.8}>
+                        <TouchableOpacity style={[styles.buyBtn, { backgroundColor: CREAM }]} activeOpacity={0.8} onPress={() => navigation.navigate('Subscription', { scrollToAP: true })}>
                             <Text style={[styles.buyBtnText, { color: BLACK }]}>BUY MORE</Text>
                         </TouchableOpacity>
                     </View>
@@ -164,18 +163,22 @@ export default function MyProfileScreen() {
                 </View>
 
                 {/* ── My Prompts ─────────────────────────────────────────── */}
-                <SectionLabel text="MY PROMPTS" />
-                <LightCard style={{ marginBottom: 32 }}>
-                    {MY_PROMPTS.map((prompt, index) => (
-                        <View
-                            key={index}
-                            style={index < MY_PROMPTS.length - 1 ? styles.promptBorder : undefined}
-                        >
-                            <Text style={styles.promptQ}>{prompt.question}</Text>
-                            <Text style={styles.promptA}>{prompt.answer}</Text>
-                        </View>
-                    ))}
-                </LightCard>
+                {prompts.length > 0 && (
+                    <>
+                        <SectionLabel text="MY PROMPTS" />
+                        <LightCard style={{ marginBottom: 32 }}>
+                            {prompts.map((prompt, index) => (
+                                <View
+                                    key={index}
+                                    style={index < prompts.length - 1 ? styles.promptBorder : undefined}
+                                >
+                                    <Text style={styles.promptQ}>{prompt.question}</Text>
+                                    <Text style={styles.promptA}>{prompt.answer}</Text>
+                                </View>
+                            ))}
+                        </LightCard>
+                    </>
+                )}
 
                 {/* ── Menu ───────────────────────────────────────────────── */}
                 <View style={styles.menuList}>

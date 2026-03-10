@@ -1,39 +1,70 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Animated, Easing } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Animated, Easing, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { BLACK, CREAM, ORANGE } from '../../constants/colors';
+import { useAuth } from '@clerk/expo';
+import { useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 
 type IconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
-const SECTIONS = [
+const SECTIONS: { title: string; items: { label: string; icon: IconName; sub: string; route?: string }[] }[] = [
     {
         title: 'Account',
         items: [
-            { label: 'Profile Information', icon: 'person' as IconName, sub: 'Name, bio, photos' },
-            { label: 'Email Preferences', icon: 'mail-outline' as IconName, sub: 'Notifications & updates' },
+            { label: 'Profile Information', icon: 'person', sub: 'Name, bio, photos', route: 'EditProfile' },
+            { label: 'Email Preferences', icon: 'mail-outline', sub: 'Notifications & updates' },
         ],
     },
     {
         title: 'Privacy',
         items: [
-            { label: 'Visibility Settings', icon: 'visibility' as IconName, sub: 'Who can see your profile' },
-            { label: 'Blocked Users', icon: 'block' as IconName, sub: 'Manage blocked accounts' },
+            { label: 'Visibility Settings', icon: 'visibility', sub: 'Who can see your profile' },
+            { label: 'Blocked Users', icon: 'block', sub: 'Manage blocked accounts' },
         ],
     },
     {
         title: 'Support',
         items: [
-            { label: 'Help Center', icon: 'help-outline' as IconName, sub: 'FAQs & guides' },
-            { label: 'Contact Us', icon: 'chat-bubble-outline' as IconName, sub: 'Reach our team' },
-            { label: 'About', icon: 'info-outline' as IconName, sub: 'Version, legal & licenses' },
+            { label: 'Help Center', icon: 'help-outline', sub: 'FAQs & guides' },
+            { label: 'Contact Us', icon: 'chat-bubble-outline', sub: 'Reach our team' },
+            { label: 'About', icon: 'info-outline', sub: 'Version, legal & licenses', route: 'About' },
         ],
     },
 ];
 
 export default function SettingsScreen() {
     const navigation = useNavigation<any>();
+    const { signOut } = useAuth();
+    const deleteAccount = useMutation(api.users.deleteCurrentAccount);
+
+    const handleSignOut = () => {
+        signOut();
+    };
+
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            'Delete Account',
+            'This will permanently delete your account and all data. This cannot be undone.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await deleteAccount();
+                            await signOut();
+                        } catch (e) {
+                            Alert.alert('Error', 'Failed to delete account. Please try again.');
+                        }
+                    },
+                },
+            ]
+        );
+    };
 
     const titleY = useRef(new Animated.Value(30)).current;
     const titleOpacity = useRef(new Animated.Value(0)).current;
@@ -137,6 +168,7 @@ export default function SettingsScreen() {
                                         <TouchableOpacity
                                             key={item.label}
                                             activeOpacity={0.75}
+                                            onPress={item.route ? () => navigation.navigate(item.route!) : undefined}
                                             style={{
                                                 flexDirection: 'row',
                                                 alignItems: 'center',
@@ -168,6 +200,7 @@ export default function SettingsScreen() {
                             <View style={{ borderRadius: 22, overflow: 'hidden', backgroundColor: '#FFFFFF' }}>
                                 <TouchableOpacity
                                     activeOpacity={0.75}
+                                    onPress={handleDeleteAccount}
                                     style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 18 }}
                                 >
                                     <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(224,58,47,0.08)', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
@@ -185,6 +218,7 @@ export default function SettingsScreen() {
                         {/* Sign Out */}
                         <TouchableOpacity
                             activeOpacity={0.85}
+                            onPress={handleSignOut}
                             style={{
                                 backgroundColor: BLACK,
                                 borderRadius: 32,

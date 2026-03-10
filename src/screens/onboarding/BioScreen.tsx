@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { BLACK, CREAM, ORANGE } from '../../constants/colors';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
 
 const BIO_PROMPTS = [
     "I'm looking for...",
@@ -15,6 +16,7 @@ const BIO_PROMPTS = [
 
 const BioScreen = () => {
     const navigation = useNavigation<any>();
+    const saveField = useUpdateOnboarding();
     const [bio, setBio] = useState('');
     const contentOpacity = useRef(new Animated.Value(0)).current;
 
@@ -22,7 +24,10 @@ const BioScreen = () => {
         Animated.timing(contentOpacity, { toValue: 1, duration: 600, delay: 200, useNativeDriver: true }).start();
     }, []);
 
-    const handleContinue = () => navigation.navigate('DatingIntent');
+    const handleContinue = async () => {
+        await saveField({ publicBio: bio.trim() || null });
+        navigation.navigate('DatingIntent');
+    };
 
     const handlePromptSelect = (prompt: string) => {
         setBio(prev => {

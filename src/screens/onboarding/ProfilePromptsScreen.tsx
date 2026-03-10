@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { ORANGE } from '../../constants/colors';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
 
 const PROMPTS_LIST = [
     "A non-negotiable for me is...",
@@ -20,6 +21,7 @@ const PROMPTS_LIST = [
 
 const ProfilePromptsScreen = () => {
     const navigation = useNavigation<any>();
+    const saveField = useUpdateOnboarding();
 
     const [prompts, setPrompts] = useState([
         { id: 1, question: "Select a prompt...", answer: "" },
@@ -163,7 +165,13 @@ const ProfilePromptsScreen = () => {
                 <View className="px-8 pb-10 pt-4">
                     <TouchableOpacity
                         className={`w-full py-4 rounded-full items-center active:scale-95 ${isReady ? 'bg-black' : 'bg-black/20'}`}
-                        onPress={() => navigation.navigate('Drinking')}
+                        onPress={async () => {
+                            const filledPrompts = prompts
+                                .filter(p => p.question !== 'Select a prompt...' && p.answer.trim())
+                                .map((p, i) => ({ id: i, question: p.question, answer: p.answer }));
+                            if (filledPrompts.length > 0) await saveField({ prompts: filledPrompts });
+                            navigation.navigate('Drinking');
+                        }}
                         disabled={!isReady}
                     >
                         <Text className={`text-base font-black uppercase ${isReady ? 'text-cream' : 'text-black/30'}`} style={{ letterSpacing: 2 }}>

@@ -4,9 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { ORANGE } from '../../constants/colors';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
 
 const BirthdayScreen = () => {
     const navigation = useNavigation<any>();
+    const saveField = useUpdateOnboarding();
     const [month, setMonth] = useState('');
     const [day, setDay] = useState('');
     const [year, setYear] = useState('');
@@ -43,6 +45,18 @@ const BirthdayScreen = () => {
         setDay(text);
         if (text.length === 2) yearInput.current?.focus();
     };
+
+    const isValidDate = month.length === 2 && day.length === 2 && year.length === 4;
+    const isOldEnough = (() => {
+        if (!isValidDate) return false;
+        const birth = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+        return age >= 18;
+    })();
+    const isReady = isValidDate && isOldEnough;
 
     return (
         <View className="flex-1 bg-cream relative overflow-hidden">
@@ -141,10 +155,15 @@ const BirthdayScreen = () => {
                 {/* Continue Button */}
                 <View className="px-8 pb-10 items-center">
                     <TouchableOpacity
-                        className="bg-black py-4 rounded-full w-full items-center active:scale-95"
-                        onPress={() => navigation.navigate('Gender')}
+                        className={`py-4 rounded-full w-full items-center active:scale-95 ${isReady ? 'bg-black' : 'bg-black/20'}`}
+                        disabled={!isReady}
+                        onPress={async () => {
+                            const birthday = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                            await saveField({ birthday });
+                            navigation.navigate('Gender');
+                        }}
                     >
-                        <Text className="text-cream text-base font-black uppercase" style={{ letterSpacing: 2 }}>CONTINUE</Text>
+                        <Text className={`text-base font-black uppercase ${isReady ? 'text-cream' : 'text-black/30'}`} style={{ letterSpacing: 2 }}>CONTINUE</Text>
                     </TouchableOpacity>
 
                     <View className="mt-5 flex-row items-center gap-2 opacity-30">

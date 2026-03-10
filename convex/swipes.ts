@@ -6,6 +6,7 @@ export const recordSwipe = mutation({
     args: {
         toClerkId: v.string(),
         direction: v.union(v.literal("left"), v.literal("right")),
+        introMessage: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const identity = await ctx.auth.getUserIdentity();
@@ -30,19 +31,21 @@ export const recordSwipe = mutation({
             .first();
 
         if (existing) {
-            // Only patch direction — preserve original createdAt
-            await ctx.db.patch(existing._id, {
-                direction: args.direction,
-            });
+            const patch: any = { direction: args.direction };
+            if (args.introMessage !== undefined) patch.introMessage = args.introMessage;
+            await ctx.db.patch(existing._id, patch);
             // Fall through to mutual-match check so a changed left→right swipe creates a match
         } else {
             await ctx.db.insert("swipes", {
                 fromClerkId,
                 toClerkId: args.toClerkId,
                 direction: args.direction,
+                ...(args.introMessage !== undefined && { introMessage: args.introMessage }),
                 createdAt: Date.now(),
             });
         }
+        // TODO: send push notification to recipient when direction === 'right'
+        // expo-notifications is not currently installed in this project.
 
         // Check for mutual right swipe → create match
         if (args.direction === "right") {
@@ -201,6 +204,79 @@ export const getPendingLikes = query({
         return enriched
             .filter((u): u is NonNullable<typeof u> => u !== null)
             .sort((a, b) => b.swipedAt - a.swipedAt);
+    },
+});
+
+// Returns the current user's swipe record for a specific other user (to check button state)
+export const getMySwipeForUser = query({
+    args: { toClerkId: v.string() },
+    handler: async (ctx, args) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) return null;
+        return await ctx.db
+            .query("swipes")
+            .withIndex("by_pair", (q) =>
+                q.eq("fromClerkId", identity.subject).eq("toClerkId", args.toClerkId)
+            )
+            .first();
+    },
+});
+
+// Returns all pending connection requests I've sent (right swipes with no mutual match yet)
+export const getMySentRequests = query({
+    args: {},
+    handler: async (ctx) => {
+        const identity = await ctx.auth.getUserIdentity();
+        if (!identity) return [];
+        const myClerkId = identity.subject;
+
+        const allMySwipes = await ctx.db
+            .query("swipes")
+            .withIndex("by_from", (q) => q.eq("fromClerkId", myClerkId))
+            .collect();
+        const myRightSwipes = allMySwipes.filter((s) => s.direction === "right");
+
+        const matchesAs1 = await ctx.db.query("matches").withIndex("by_user1", (q) => q.eq("user1ClerkId", myClerkId)).collect();
+        const matchesAs2 = await ctx.db.query("matches").withIndex("by_user2", (q) => q.eq("user2ClerkId", myClerkId)).collect();
+        const matchedClerkIds = new Set([
+            ...matchesAs1.map((m) => m.user2ClerkId),
+            ...matchesAs2.map((m) => m.user1ClerkId),
+        ]);
+
+        const pendingSwipes = myRightSwipes.filter((s) => !matchedClerkIds.has(s.toClerkId));
+
+        const enriched = await Promise.all(
+            pendingSwipes.map(async (swipe) => {
+                const user = await ctx.db
+                    .query("users")
+                    .withIndex("by_clerkId", (q) => q.eq("clerkId", swipe.toClerkId))
+                    .first();
+                if (!user) return null;
+                let photos = user.photos || [];
+                if (photos.length === 0) {
+                    const photoRows = await ctx.db
+                        .query("photos")
+                        .withIndex("by_clerkId", (q) => q.eq("clerkId", user.clerkId))
+                        .collect();
+                    photos = photoRows.sort((a, b) => a.position - b.position).map((p) => p.url);
+                }
+                return {
+                    swipeId: swipe._id,
+                    toClerkId: swipe.toClerkId,
+                    toUserId: user._id,
+                    introMessage: swipe.introMessage ?? '',
+                    sentAt: swipe.createdAt,
+                    otherUser: {
+                        clerkId: user.clerkId,
+                        firstName: user.firstName || user.name,
+                        photos,
+                    },
+                };
+            })
+        );
+        return enriched
+            .filter((r): r is NonNullable<typeof r> => r !== null)
+            .sort((a, b) => b.sentAt - a.sentAt);
     },
 });
 

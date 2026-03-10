@@ -2,6 +2,7 @@
   "expo": {
     "name": "Align_Final",
     "slug": "Align_Final",
+    "scheme": "alignfinal",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

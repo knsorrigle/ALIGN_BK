@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { ORANGE } from '../../constants/colors';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
 
 const PRONOUN_OPTIONS = [
     'HE / HIM',
@@ -16,6 +17,7 @@ const PRONOUN_OPTIONS = [
 
 const PronounsScreen = () => {
     const navigation = useNavigation<any>();
+    const saveField = useUpdateOnboarding();
     const [selectedPronouns, setSelectedPronouns] = useState<string[]>([]);
     const [customPronoun, setCustomPronoun] = useState('');
 
@@ -113,7 +115,7 @@ const PronounsScreen = () => {
                                 return (
                                     <Animated.View
                                         key={pronoun}
-                                        style={{ opacity: contentOpacity, transform: [{ translateY: contentOpacity.interpolate({ inputRange: [0, 1], outputRange: [20 + index * 5, 0] }) }] }}
+                                        style={{ opacity: contentOpacity, transform: [{ translateY: contentOpacity.interpolate({ inputRange: [0, 1], outputRange: [20 + index * 5, 0] }) }], alignSelf: 'flex-start' }}
                                     >
                                         <TouchableOpacity
                                             onPress={() => togglePronoun(pronoun)}
@@ -154,7 +156,13 @@ const PronounsScreen = () => {
                 <View className="px-8 pb-10">
                     <TouchableOpacity
                         className={`w-full py-4 rounded-full items-center active:scale-95 ${isReady ? 'bg-black' : 'bg-black/20'}`}
-                        onPress={() => navigation.navigate('Workplace')}
+                        onPress={async () => {
+                            const pronounsList = customPronoun.trim()
+                                ? [...selectedPronouns, customPronoun.trim()]
+                                : selectedPronouns;
+                            if (pronounsList.length > 0) await saveField({ pronouns: pronounsList });
+                            navigation.navigate('Workplace');
+                        }}
                         disabled={!isReady}
                     >
                         <Text className={`text-base font-black uppercase ${isReady ? 'text-cream' : 'text-black/30'}`} style={{ letterSpacing: 2 }}>CONTINUE</Text>

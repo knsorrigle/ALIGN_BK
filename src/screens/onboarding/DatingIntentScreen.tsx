@@ -4,11 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { BLACK, CREAM, ORANGE } from '../../constants/colors';
+import { useUpdateOnboarding } from '../../hooks/useUpdateOnboarding';
 
 const INTENT_OPTIONS = ['Long-Term', 'Casual', 'Exploring', 'Marriage'];
 
 const DatingIntentScreen = () => {
     const navigation = useNavigation<any>();
+    const saveField = useUpdateOnboarding();
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
     const titleTranslateX = useRef(new Animated.Value(-60)).current;
@@ -108,7 +110,10 @@ const DatingIntentScreen = () => {
                 {/* Footer */}
                 <View className="px-6 pb-10 pt-2">
                     <TouchableOpacity
-                        onPress={() => navigation.navigate('Children')}
+                        onPress={async () => {
+                            if (selectedOption) await saveField({ datingIntention: selectedOption });
+                            navigation.navigate('Children');
+                        }}
                         disabled={!selectedOption}
                         className={`py-4 rounded-full items-center ${selectedOption ? 'bg-black' : 'bg-black/10'}`}
                         style={{ opacity: selectedOption ? 1 : 0.5 }}

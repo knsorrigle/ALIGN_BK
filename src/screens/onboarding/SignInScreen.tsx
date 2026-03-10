@@ -1,20 +1,32 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, Easing, Dimensions, Platform } from 'react-native';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
+import {
+    View, Text, TouchableOpacity, Animated, Easing,
+    Dimensions, ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, AntDesign } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useOAuth } from '@clerk/expo';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { BLACK, CREAM, ORANGE } from '../../constants/colors';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const { width } = Dimensions.get('window');
 
 const SignInScreen = () => {
     const navigation = useNavigation<any>();
+    const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' });
+    const [isLoading, setIsLoading] = useState(false);
 
     const titleOpacity = useRef(new Animated.Value(0)).current;
     const contentTranslateY = useRef(new Animated.Value(50)).current;
     const marqueeAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
+        void WebBrowser.warmUpAsync();
+
         Animated.parallel([
             Animated.timing(titleOpacity, { toValue: 1, duration: 800, useNativeDriver: true }),
             Animated.timing(contentTranslateY, { toValue: 0, duration: 800, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
@@ -23,15 +35,27 @@ const SignInScreen = () => {
         Animated.loop(
             Animated.timing(marqueeAnim, { toValue: -width, duration: 10000, easing: Easing.linear, useNativeDriver: true })
         ).start();
+
+        return () => { void WebBrowser.coolDownAsync(); };
     }, []);
 
-    const handleGoogleSignIn = () => {
-        navigation.reset({ index: 0, routes: [{ name: 'MainApp' }] });
-    };
-
-    const handleCreateAccount = () => {
-        navigation.replace('Onboarding');
-    };
+    // Single OAuth handler for both buttons — RootNavigator handles routing after sign-in
+    const handleGoogleOAuth = useCallback(async () => {
+        if (isLoading) return;
+        try {
+            setIsLoading(true);
+            const redirectUrl = Linking.createURL('/');
+            const { createdSessionId, setActive } = await startOAuthFlow({ redirectUrl });
+            if (createdSessionId && setActive) {
+                await setActive({ session: createdSessionId });
+                // Auth state changes → RootNavigator re-renders → routes to Onboarding or MainApp
+            }
+        } catch (err) {
+            console.error('OAuth error:', err);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [startOAuthFlow, isLoading]);
 
     return (
         <View style={{ flex: 1, backgroundColor: CREAM }}>
@@ -99,9 +123,10 @@ const SignInScreen = () => {
                     {/* Divider */}
                     <View style={{ height: 3, backgroundColor: '#E0DDD8', marginBottom: 32, borderRadius: 2 }} />
 
-                    {/* Google Button */}
+                    {/* Google Sign-In Button */}
                     <TouchableOpacity
-                        onPress={handleGoogleSignIn}
+                        onPress={handleGoogleOAuth}
+                        disabled={isLoading}
                         style={{
                             flexDirection: 'row',
                             alignItems: 'center',
@@ -112,9 +137,13 @@ const SignInScreen = () => {
                             paddingVertical: 16,
                             borderRadius: 32,
                             gap: 12,
+                            opacity: isLoading ? 0.7 : 1,
                         }}
                     >
-                        <AntDesign name="google" size={20} color={BLACK} />
+                        {isLoading
+                            ? <ActivityIndicator size="small" color={BLACK} />
+                            : <AntDesign name="google" size={20} color={BLACK} />
+                        }
                         <Text
                             style={{
                                 fontSize: 14,
@@ -124,7 +153,7 @@ const SignInScreen = () => {
                                 textTransform: 'uppercase',
                             }}
                         >
-                            CONTINUE WITH GOOGLE
+                            {isLoading ? 'SIGNING IN...' : 'CONTINUE WITH GOOGLE'}
                         </Text>
                     </TouchableOpacity>
 
@@ -133,7 +162,7 @@ const SignInScreen = () => {
                         <Text style={{ fontSize: 11, fontWeight: '700', color: '#999', letterSpacing: 1, textTransform: 'uppercase' }}>
                             NEW HERE? —
                         </Text>
-                        <TouchableOpacity onPress={handleCreateAccount}>
+                        <TouchableOpacity onPress={handleGoogleOAuth} disabled={isLoading}>
                             <Text
                                 style={{
                                     fontSize: 11,
